@@ -5,14 +5,31 @@ import seaborn as sns
 import json
 import os
 
-dir_path = os.path.dirname(os.path.realpath(__file__))
-file_path = os.path.join(dir_path, 'data.json')
+@st.cache
+def load_data():
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    file_path = os.path.join(dir_path, 'data.json')
 
-# Lire le fichier JSON
-with open(file_path, "r", encoding='utf-8') as file:
-    data = json.load(file)
+    # Lire le fichier JSON
+    with open(file_path, "r", encoding='utf-8') as file:
+        data = json.load(file)
+    return data
 
-@st.cache_data
+def display_sidebar_info():
+    # Barre latérale
+    st.sidebar.title("#datavz2023efrei")
+
+    # Vos informations personnelles
+    st.sidebar.text("SANJIVY Dorian")
+    st.sidebar.text("Promo 2025 - BI2")
+
+    # Liens vers vos profils
+    linkedin_url = "https://www.linkedin.com/in/dorian-sanjivy/"
+    github_url = "https://github.com/DorianSanjivy"
+
+    st.sidebar.markdown(f"[**LinkedIn**]({linkedin_url})")
+    st.sidebar.markdown(f"[**GitHub**]({github_url})")
+
 def load_all_dataframes(data):
     global df_ca, df_repartition, df_segment_ca, df_segment_repartition, df_ecosysteme_ca, df_ecosysteme_repartition
     global df_supports_chiffre_affaires, df_supports_repartition, df_genre_units, df_genre_revenue
@@ -35,25 +52,8 @@ def load_all_dataframes(data):
     df_sales_distribution = pd.DataFrame(data["data_sales_distribution_pegi"])
     df_avg_price_pegi = pd.DataFrame(data["data_avg_price_age_pegi"])
 
-
-@st.cache_data
-def display_sidebar_info():
-    # Barre latérale
-    st.sidebar.title("#datavz2023efrei")
-
-    # Vos informations personnelles
-    st.sidebar.text("SANJIVY Dorian")
-    st.sidebar.text("Promo 2025 - BI2")
-
-    # Liens vers vos profils
-    linkedin_url = "https://www.linkedin.com/in/dorian-sanjivy/"
-    github_url = "https://github.com/DorianSanjivy"
-
-    st.sidebar.markdown(f"[**LinkedIn**]({linkedin_url})")
-    st.sidebar.markdown(f"[**GitHub**]({github_url})")
-
-
 display_sidebar_info()
+data = load_data()
 load_all_dataframes(data)
 
 # Titre de l'application
