@@ -1,3 +1,4 @@
+import base64
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -5,7 +6,12 @@ import seaborn as sns
 import json
 import os
 
-@st.cache
+# Function to convert image to base64
+def get_image_base64(image_path):
+    with open(image_path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode('utf-8')
+
+@st.cache_data
 def load_data():
     dir_path = os.path.dirname(os.path.realpath(__file__))
     file_path = os.path.join(dir_path, 'data.json')
@@ -15,20 +21,43 @@ def load_data():
         data = json.load(file)
     return data
 
+
 def display_sidebar_info():
     # Barre latérale
     st.sidebar.title("#datavz2023efrei")
 
-    # Vos informations personnelles
-    st.sidebar.text("SANJIVY Dorian")
-    st.sidebar.text("Promo 2025 - BI2")
+    # Lien vers la source des données avec une icône
+    st.sidebar.markdown(
+        "[:link: **Source CNC**](https://www.data.gouv.fr/fr/datasets/marche-du-jeu-video/)"
+    )
 
-    # Liens vers vos profils
+    st.sidebar.markdown("---")  # Ajoute une ligne de séparation
+
+    # Informations personnelles
+    st.sidebar.markdown("## SANJIVY Dorian")
+    st.sidebar.markdown("Promo 2025 - BI2")
+
+    st.sidebar.markdown("---")  # Ajoute une ligne de séparation
+
+    # Logos + Lien vers des réseaux
+    current_directory = os.path.dirname(os.path.realpath(__file__))
+    linkedin_path = os.path.join(current_directory, 'linkedin-logo.png')
+    github_path = os.path.join(current_directory, 'github-logo.png')
+
     linkedin_url = "https://www.linkedin.com/in/dorian-sanjivy/"
     github_url = "https://github.com/DorianSanjivy"
 
-    st.sidebar.markdown(f"[**LinkedIn**]({linkedin_url})")
-    st.sidebar.markdown(f"[**GitHub**]({github_url})")
+    linkedin_logo_base64 = get_image_base64(linkedin_path)
+    github_logo_base64 = get_image_base64(github_path)
+
+    logos_markdown = f'''
+    <a href="{linkedin_url}" target="_blank"><img src="data:image/png;base64,{linkedin_logo_base64}" width="64"></a>
+    &nbsp; &nbsp; <!-- Double espace HTML pour un meilleur espacement entre les logos -->
+    <a href="{github_url}" target="_blank"><img src="data:image/png;base64,{github_logo_base64}" width="64"></a>
+    '''
+
+    st.sidebar.markdown(logos_markdown, unsafe_allow_html=True)
+
 
 def load_all_dataframes(data):
     global df_ca, df_repartition, df_segment_ca, df_segment_repartition, df_ecosysteme_ca, df_ecosysteme_repartition
