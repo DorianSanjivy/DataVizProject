@@ -1,10 +1,15 @@
 import base64
+import altair as alt
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 import matplotlib.pyplot as plt
-import seaborn as sns
 import json
 import os
+from bokeh.plotting import figure
+from bokeh.palettes import Category20c
+from math import pi
+from bokeh.transform import cumsum
 
 # Function to convert image to base64
 def get_image_base64(image_path):
@@ -86,139 +91,242 @@ data = load_data()
 load_all_dataframes(data)
 
 # Titre de l'application
-st.title("Analyse du marché du jeu vidéo de 2016 à 2021")
+st.title("Quelles sont les évolutions marquantes du marché du jeu vidéo, où se trouvent les opportunités à venir ?")
 
-# Introduction ou texte explicatif
-st.write("""
-Explorons ensemble les tendances, les ventes et l'évolution du marché du jeu vidéo pendant ces années !
-""")
 
-# Sélection de l'année
-year = st.sidebar.slider('Choisir une année', 2017, 2021, 2017)
 
-# Affichage des données de chiffre d'affaires pour l'année sélectionnée
-st.subheader(f"Chiffre d'affaires en {year} (M€)")
-st.bar_chart(df_ca.set_index("Année").loc[year])
+# Analyse du Chiffre d'Affaires sur le marché du jeu vidéo
+# Initialisation des données pour la visualisation
+annees = df_ca["Année"]
+ca_total = df_ca["Total"]
+ca_pc = df_ca["PC"]
+ca_console = df_ca["Console"]
+ca_mobile = df_ca["Mobile"]
 
-# Affichage de la répartition pour l'année sélectionnée
-st.subheader(f"Répartition du chiffre d'affaires en {year} (%)")
-st.bar_chart(df_repartition.set_index("Année").loc[year])
+fig, ax1 = plt.subplots(figsize=(10,6))
 
-# Visualisation du chiffre d'affaires selon le segment
-st.subheader(f"Chiffre d'affaires selon le segment en {year} (M€)")
-st.bar_chart(df_segment_ca.set_index("Année").loc[year])
+# Tracer le chiffre d'affaires total avec ax1
+ax1.set_xlabel('Année', color='black')
+ax1.set_ylabel('Chiffre d\'affaires Total (en M€)', color='black')
+ax1.plot(annees, ca_total, color='black', label='Chiffre d\'affaires Total', linewidth=2.5)
+ax1.tick_params(axis='y', labelcolor='black', colors='black')
+ax1.tick_params(axis='x', colors='black')
 
-# Visualisation de la répartition du chiffre d'affaires selon le segment
-st.subheader(f"Répartition du chiffre d'affaires selon le segment en {year} (%)")
-st.bar_chart(df_segment_repartition.set_index("Année").loc[year])
+# Pour s'assurer que les années sont présentées par année entière
+ax1.set_xticks(annees)
 
-# Visualisation du chiffre d'affaires selon le segment et l'écosystème
-st.subheader(f"Chiffre d'affaires selon le segment et l'écosystème en {year} (M€)")
-st.bar_chart(df_ecosysteme_ca.set_index("Année").loc[year])
+# Tracer la segmentation sans un axe secondaire
+ax1.stackplot(annees, ca_pc, ca_console, ca_mobile, labels=['PC','Console','Mobile'], alpha=0.6)
+ax1.legend(loc='upper left')
 
-# Visualisation de la répartition du chiffre d'affaires selon le segment et l'écosystème
-st.subheader(f"Répartition du chiffre d'affaires selon le segment et l'écosystème en {year} (%)")
-st.bar_chart(df_ecosysteme_repartition.set_index("Année").loc[year])
+# Enlever les bords de l'axe
+for spine in ax1.spines.values():
+    spine.set_visible(False)
 
-st.subheader("Chiffre d’affaires du marché des jeux vidéo selon les supports de lecture (M€)")
-fig, ax = plt.subplots()
-df_supports_chiffre_affaires.set_index("Année").plot(kind="bar", ax=ax)
-plt.title('Chiffre d’affaires par support de lecture (M€)')
-plt.ylabel('Chiffre d’affaires (M€)')
-plt.tight_layout()
+fig.tight_layout()
+plt.title('Analyse du Chiffre d\'Affaires sur le marché du jeu vidéo', color='black')
 st.pyplot(fig)
 
-st.subheader("Répartition du chiffre d'affaires des ventes de jeux vidéo selon les supports de lecture (%)")
-fig2, ax2 = plt.subplots()
-df_supports_repartition.set_index("Année").plot(kind="bar", ax=ax2)
-plt.title('Répartition par support de lecture (%)')
-plt.ylabel('Pourcentage (%)')
+
+
+# Création d'un graphique à barres empilées avec Streamlit
+st.markdown("<h1 style='text-align: center;'>Revenus par Genre de Jeu Vidéo</h1>", unsafe_allow_html=True)
+
+# Extraire les années et les données par genre
+annees = df_genre_revenue["Année"].tolist()
+data_by_genre = df_genre_revenue.drop("Année", axis=1)
+
+# Convertir les données pour qu'elles soient compatibles avec le tracé de Streamlit
+df_long = pd.melt(df_genre_revenue, id_vars=['Année'], value_vars=data_by_genre.columns)
+
+# Créer le graphique à barres empilées avec un schéma de couleurs personnalisé
+bars = alt.Chart(df_long).mark_bar().encode(
+    x=alt.X('Année:O', axis=alt.Axis(title='', labelAngle=0)),
+    y=alt.Y('sum(value):Q', title="Revenus (en M€)"),
+    color=alt.Color('variable:N', scale=alt.Scale(scheme='set2'), legend=alt.Legend(title="Genre")),
+    order=alt.Order(
+      # Ordre des bars par colonne
+      'variable:N',
+      sort='ascending'
+    )
+)
+
+st.altair_chart(bars, use_container_width=True)
+
+
+
+# Évolution du Prix Moyen des Jeux par Genre (Top 5 variations)
+
+# Création d'un dataframe pour stocker les variations de prix
+genres_prices = df_avg_price.drop('Année', axis=1)
+
+# Calculer la variation de prix pour chaque genre
+df_avg_price = df_avg_price.set_index('Année')  # Définir "Année" comme index pour faciliter les calculs
+variations = genres_prices.pct_change().sum().sort_values(ascending=False)
+
+# Sélectionner les 5 genres avec la plus grande variation
+top_genres_names = variations.head(5).index
+
+# Filtrer df_avg_price pour ne garder que les genres du Top 5
+df_top_genres = df_avg_price[top_genres_names].reset_index()
+
+# Transformer le dataframe pour le format long
+df_long = df_top_genres.melt('Année', var_name='Genre', value_name='Prix')
+
+# Afficher le titre
+st.title('Évolution du Prix Moyen des Jeux par Genre (Top 5 variations)')
+
+# Créer le graphique à ligne avec Altair
+chart = alt.Chart(df_long).mark_line().encode(
+    x=alt.X('Année:O', title='Année', axis=alt.Axis(labelAngle=0)),
+    y=alt.Y('Prix:Q', title='Prix en €'),
+    color='Genre:N',
+    tooltip=['Genre', 'Année', 'Prix']
+).properties(
+    width=600,
+    height=400
+)
+
+st.altair_chart(chart, use_container_width=True)
+
+
+
+# Chiffre d'affaires par écosystème
+# Définition des couleurs de base pour chaque plate-forme (couleurs pastel)
+base_colors = {
+    'Console': (0.6, 0.8, 1),  # Bleu pastel
+    'PC': (1, 0.6, 0.6),  # Rouge pastel
+    'Mobile': (0.6, 1, 0.6)  # Vert pastel
+}
+
+# Définition des catégories pour chaque plate-forme
+platform_categories = {
+    'Console': ["Matériel Console", "Accessoire Console", "Logiciel Physique Console",
+                "Logiciel Dématérialisé Console"],
+    'PC': ["Matériel PC", "Accessoire PC", "Écrans PC", "Logiciel Physique PC", "Logiciel Dématérialisé PC"],
+    'Mobile': ["Logiciel Mobile"]
+}
+
+
+# Fonction pour ajuster la luminosité d'une couleur
+def adjust_lightness(color, amount=0.5):
+    import colorsys
+    try:
+        c = colorsys.rgb_to_hls(*color)
+        return colorsys.hls_to_rgb(c[0], max(0, min(1, amount * c[1])), c[2])
+    except:
+        return color
+
+# Création du graphique
+fig, ax = plt.subplots(figsize=(15, 8))
+
+# Pour stocker les hauteurs cumulatives
+height_cumulative = [0] * len(df_ecosysteme_ca['Année'])
+
+# Parcourir chaque plate-forme
+for platform, categories in platform_categories.items():
+    base_color = base_colors[platform]
+
+    # Parcourir chaque catégorie dans la plate-forme
+    for i, category in enumerate(categories):
+        # Ajuster la luminosité pour la catégorie
+        category_color = adjust_lightness(base_color,
+                                          amount=1 - i * 0.1)  # Réduire légèrement la luminosité pour chaque catégorie
+
+        values = df_ecosysteme_ca[category]
+        ax.bar(df_ecosysteme_ca['Année'], values, bottom=height_cumulative, color=category_color, label=category)
+
+        # Mise à jour des hauteurs cumulatives
+        height_cumulative = [h + v for h, v in zip(height_cumulative, values)]
+
+# Ajouter des éléments supplémentaires au graphique
+ax.set_title('Chiffre d\'affaires par écosystème')
+ax.set_ylabel('CA (M€)')
+
+# Inversion de l'ordre des légendes pour les aligner avec le graphique
+handles, labels = ax.get_legend_handles_labels()
+ax.legend(handles[::-1], labels[::-1], loc='upper left', bbox_to_anchor=(1, 1))
+
+plt.xticks(df_ecosysteme_ca['Année'])
 plt.tight_layout()
-st.pyplot(fig2)
+st.pyplot(plt)
 
 
-st.title("Marché des jeux vidéo console selon le genre")
 
-st.subheader("Marché des jeux vidéo console selon le genre (milliers d’unités)")
+# Répartition des jeux par classification PEGI
+# Sélectionner l'année avec un slider
+selected_year = st.slider('Choisissez une année', 2016, 2021, 2016)
 
-fig, ax = plt.subplots(figsize=(12,6))
-df_genre_units.set_index("Année").plot(kind="bar", ax=ax)
-plt.title('Marché des jeux vidéo console selon le genre (milliers d’unités)')
-plt.ylabel('Nombre d’unités (en milliers)')
-plt.tight_layout()
-st.pyplot(fig)
+# Filtrer le DataFrame selon l'année sélectionnée et exclure la colonne "Total"
+data_selected_year = df_units[df_units["Année"] == selected_year].drop(columns=["Année", "Total"]).T
+data_selected_year = data_selected_year.reset_index()
+data_selected_year.columns = ['PEGI', 'value']
 
-st.subheader("Chiffre d’affaires du marché des jeux vidéo console selon le genre (M€)")
+# Calculer les angles pour le graphique à secteurs
+data_selected_year['angle'] = data_selected_year['value']/data_selected_year['value'].sum() * 2*pi
 
-fig2, ax2 = plt.subplots(figsize=(12,6))
-df_genre_revenue.set_index("Année").plot(kind="bar", ax=ax2)
-plt.title('Chiffre d’affaires selon le genre (M€)')
-plt.ylabel('Chiffre d’affaires (M€)')
-plt.tight_layout()
-st.pyplot(fig2)
+# Assigner des couleurs pour chaque segment
+data_selected_year['color'] = Category20c[len(data_selected_year)]
 
+# Calculer le pourcentage pour chaque classification PEGI
+data_selected_year['percentage'] = (data_selected_year['value'] / data_selected_year['value'].sum()) * 100
 
-# Les dataframes df_market_share et df_avg_price doivent être définis ici ou importés
+# Créer le graphique à secteurs avec Bokeh
+p = figure(height=350, title=f"Répartition des jeux par classification PEGI ({selected_year})", toolbar_location=None,
+           tools="hover", tooltips="@PEGI: (@percentage{0.1f}%)", x_range=(-0.5, 1.0))
 
-st.title("Parts de marché et prix moyen des jeux vidéo console selon le genre")
+p.wedge(x=0, y=1, radius=0.4,
+        start_angle=cumsum('angle', include_zero=True), end_angle=cumsum('angle'),
+        line_color="white", fill_color='color', legend_field='PEGI', source=data_selected_year)
 
-st.subheader("Parts de marché des jeux vidéo console selon le genre (%)")
-
-fig, ax = plt.subplots(figsize=(12,6))
-df_market_share.set_index("Année").plot(kind="bar", ax=ax)
-plt.title('Parts de marché des jeux vidéo console selon le genre (%)')
-plt.ylabel('Parts de marché (%)')
-plt.tight_layout()
-st.pyplot(fig)
-
-st.subheader("Prix moyen des jeux vidéo console selon le genre (€)")
-
-fig2, ax2 = plt.subplots(figsize=(12,6))
-df_avg_price.set_index("Année").plot(kind="bar", ax=ax2)
-plt.title('Prix moyen des jeux vidéo console selon le genre (€)')
-plt.ylabel('Prix moyen (€)')
-plt.tight_layout()
-st.pyplot(fig2)
+# Désactiver les graduations des axes
+p.axis.visible = False
+st.bokeh_chart(p)
 
 
-# Les DataFrames df_units, df_sales, df_sales_distribution, et df_avg_price ont été définis précédemment.
 
-st.title("Marché du jeu vidéo console selon la classification PEGI")
+# Profit par unité selon la classification PEGI et l'année
+df_sales = df_sales.drop(columns=[ "Total"])
+df_units = df_units.drop(columns=[ "Total"])
+df_profit_per_unit = df_sales.copy()
+for column in df_profit_per_unit.columns:
+    if column != "Année":
+        df_profit_per_unit[column] = df_sales[column] / df_units[column]
 
-# Afficher et visualiser les données des milliers d’unités
-st.subheader("Le marché des jeux vidéo console selon la classification PEGI (milliers d’unités)")
+df_melted = df_profit_per_unit.melt(id_vars="Année", var_name="Classification PEGI", value_name="Profit par unité")
 
-fig1, ax1 = plt.subplots(figsize=(12, 6))
-df_units.set_index("Année").drop(columns=["Total"]).plot(kind="bar", ax=ax1)
-plt.title("Le marché des jeux vidéo console selon la classification PEGI (milliers d’unités)")
-plt.tight_layout()
-st.pyplot(fig1)
+# Création du graphique
+fig = px.line(df_melted, x="Année", y="Profit par unité", color="Classification PEGI", title="Profit par unité selon la classification PEGI et l'année", markers=True)
 
-# Afficher et visualiser le chiffre d’affaires
-st.subheader("Chiffre d’affaires du marché des jeux vidéo console selon la classification PEGI (M€)")
+st.plotly_chart(fig)
 
-fig2, ax2 = plt.subplots(figsize=(12, 6))
-df_sales.set_index("Année").drop(columns=["Total"]).plot(kind="bar", ax=ax2)
-plt.title("Chiffre d’affaires du marché des jeux vidéo console selon la classification PEGI (M€)")
-plt.tight_layout()
-st.pyplot(fig2)
 
-# Afficher et visualiser la répartition du chiffre d'affaires
-st.subheader("Répartition du chiffre d'affaires des jeux vidéo console selon la classification PEGI (%)")
 
-fig3, ax3 = plt.subplots(figsize=(12, 6))
-df_sales_distribution.set_index("Année").drop(columns=["Total"]).plot(kind="bar", stacked=True, ax=ax3)
-plt.title("Répartition du chiffre d'affaires des jeux vidéo console selon la classification PEGI (%)")
-plt.tight_layout()
-st.pyplot(fig3)
 
-# Afficher et visualiser le prix moyen
-st.subheader("Prix moyen des jeux vidéo console selon la classification PEGI (€)")
 
-fig4, ax4 = plt.subplots(figsize=(12, 6))
-df_avg_price_pegi.set_index("Année").drop(columns=["Total"]).plot(kind="bar", ax=ax4)
-plt.title("Prix moyen des jeux vidéo console selon la classification PEGI (€)")
-plt.tight_layout()
-st.pyplot(fig4)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
